@@ -1,0 +1,8 @@
+samples
+data.tsv
+.venv
+confusion_matrix.png
+dataset_analysis.png
+emotion_recognition_model.h5
+label_encoder_classes.npy
+training_history.png
