@@ -94,8 +94,8 @@ except Exception as e:
 print("=" * 70 + "\n")
 
 # Konfiguracja
-SAMPLE_RATE = 16000
-DURATION = 3
+SAMPLE_RATE = 16000 # liczba probek na sekunde
+DURATION = 3 # sekundy
 N_MELS = 128
 HOP_LENGTH = 512
 N_FFT = 2048
@@ -322,7 +322,7 @@ def plot_confusion_matrix(y_true, y_pred, class_names, fold_num=None):
         plt.savefig('confusion_matrix_final.png', dpi=300, bbox_inches='tight')
     plt.show()
 
-
+# trenujemy model `n_splits` razy, w kazdym treningu mamy inne dane w treningu/walidacji; TODO: sprobowac zmienic liczbe treningow 6,10
 def kfold_cross_validation(X, y, label_encoder, n_splits=5):
     """K-Fold cross validation"""
     skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=42)
@@ -372,16 +372,24 @@ def kfold_cross_validation(X, y, label_encoder, n_splits=5):
             print(f"  {cls_name}: {weight:.3f}")
 
         # Budowa i trening modelu
-        light_cnn = EmotionModels(
+        MODEL_OBJECT = EmotionModels(
             input_shape=X_train.shape[1:],
             num_classes=len(np.unique(y))
         )
-        light_cnn.build_light_cnn()# <<< -------------------- WYBOR MODELU SIECI NEURONOWEJ ---------------------
+        MODEL_OBJECT.build_light_cnn()# <<< -------------------- WYBOR MODELU SIECI NEURONOWEJ ---------------------
+        #MODEL_OBJECT.build_deep_cnn()
+        #MODEL_OBJECT.build_resnet_inspired()
+        #MODEL_OBJECT.inception_module()
+        #MODEL_OBJECT.build_inception_inspired()
+        #MODEL_OBJECT.attention_block()
+        #MODEL_OBJECT.build_attention_cnn()
+        #MODEL_OBJECT.build_mobilenet_inspired()
+        #MODEL_OBJECT.build_crnn()
 
-        light_cnn.compile_model(
+        MODEL_OBJECT.compile_model(
             optimizer=keras.optimizers.Adam(learning_rate=0.001),
         )
-        history = light_cnn.train( # <<< --------------- HIPERPARAMETRY UCZENIA ------------------------
+        history = MODEL_OBJECT.train( # <<< --------------- HIPERPARAMETRY UCZENIA ------------------------
             X_train, y_train,
             X_val, y_val,
             epochs=3,
@@ -391,10 +399,10 @@ def kfold_cross_validation(X, y, label_encoder, n_splits=5):
         fold_histories.append(history)
 
         # Ewaluacja
-        train_loss, train_acc = light_cnn.model.evaluate(X_train, y_train, verbose=0)
-        val_loss, val_acc = light_cnn.model.evaluate(X_val, y_val, verbose=0)
+        train_loss, train_acc = MODEL_OBJECT.model.evaluate(X_train, y_train, verbose=0)
+        val_loss, val_acc = MODEL_OBJECT.model.evaluate(X_val, y_val, verbose=0)
 
-        y_pred = np.argmax(light_cnn.model.predict(X_val, verbose=0), axis=1)
+        y_pred = np.argmax(MODEL_OBJECT.model.predict(X_val, verbose=0), axis=1)
 
         all_y_true.extend(y_val)
         all_y_pred.extend(y_pred)
@@ -452,8 +460,8 @@ def kfold_cross_validation(X, y, label_encoder, n_splits=5):
 
 def main():
     # Ścieżki do danych nEMO
-    SAMPLES_PATH = "samples"
-    TSV_FILE = "data.tsv"
+    SAMPLES_PATH = "nEMO-main/samples/"
+    TSV_FILE = "nEMO-main/data.tsv"
 
     # Sprawdzenie czy używamy GPU
     gpus = tf.config.list_physical_devices('GPU')
