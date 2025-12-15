@@ -283,7 +283,7 @@ def plot_fold_results(fold_histories, fold_scores):
 
     plt.tight_layout()
     plt.savefig('kfold_results.png', dpi=300, bbox_inches='tight')
-    plt.show()
+    #plt.show()
 
     return fig
 
@@ -320,7 +320,13 @@ def plot_confusion_matrix(y_true, y_pred, class_names, fold_num=None):
         plt.savefig(f'confusion_matrix_fold_{fold_num}.png', dpi=300, bbox_inches='tight')
     else:
         plt.savefig('confusion_matrix_final.png', dpi=300, bbox_inches='tight')
-    plt.show()
+    #plt.show()
+
+### USTAWIENIA TRENOWANIA, NIE ZAPOMNIJ O TYPU MODELI NA DOLE
+TRAIN_LEARNRATE=0.0001
+TRAIN_EPOCHS=6
+TRAIN_BATCHSIZE=64
+TRAIN_KFOLD_SPLITS=6
 
 # trenujemy model `n_splits` razy, w kazdym treningu mamy inne dane w treningu/walidacji; TODO: sprobowac zmienic liczbe treningow 6,10
 def kfold_cross_validation(X, y, label_encoder, n_splits=5):
@@ -376,8 +382,8 @@ def kfold_cross_validation(X, y, label_encoder, n_splits=5):
             input_shape=X_train.shape[1:],
             num_classes=len(np.unique(y))
         )
-        MODEL_OBJECT.build_light_cnn()# <<< -------------------- WYBOR MODELU SIECI NEURONOWEJ ---------------------
-        #MODEL_OBJECT.build_deep_cnn()
+        #MODEL_OBJECT.build_light_cnn()# <<< -------------------- WYBOR MODELU SIECI NEURONOWEJ ---------------------
+        MODEL_OBJECT.build_deep_cnn()
         #MODEL_OBJECT.build_resnet_inspired()
         #MODEL_OBJECT.inception_module()
         #MODEL_OBJECT.build_inception_inspired()
@@ -385,15 +391,17 @@ def kfold_cross_validation(X, y, label_encoder, n_splits=5):
         #MODEL_OBJECT.build_attention_cnn()
         #MODEL_OBJECT.build_mobilenet_inspired()
         #MODEL_OBJECT.build_crnn()
-
+        
+        
+        
         MODEL_OBJECT.compile_model(
-            optimizer=keras.optimizers.Adam(learning_rate=0.001),
+            optimizer=keras.optimizers.Adam(learning_rate=TRAIN_LEARNRATE),
         )
         history = MODEL_OBJECT.train( # <<< --------------- HIPERPARAMETRY UCZENIA ------------------------
             X_train, y_train,
             X_val, y_val,
-            epochs=3,
-            batch_size=32
+            epochs=TRAIN_EPOCHS,
+            batch_size=TRAIN_BATCHSIZE
         )
 
         fold_histories.append(history)
@@ -483,11 +491,11 @@ def main():
     fig = plot_class_distribution(y, dataset.label_encoder,
                                   "Rozkład klas - Cały dataset")
     plt.savefig('class_distribution_full_dataset.png', dpi=300, bbox_inches='tight')
-    plt.show()
+    #plt.show()
 
     # 2. K-Fold Cross Validation
     fold_histories, fold_scores = kfold_cross_validation(
-        X, y, dataset.label_encoder, n_splits=5
+        X, y, dataset.label_encoder, n_splits=TRAIN_KFOLD_SPLITS
     )
 
     # 3. Zapisanie wyników
