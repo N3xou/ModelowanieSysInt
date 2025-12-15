@@ -94,8 +94,8 @@ except Exception as e:
 print("=" * 70 + "\n")
 
 # Konfiguracja
-SAMPLE_RATE = 16000 # liczba probek na sekunde
-DURATION = 3 # sekundy
+SAMPLE_RATE = 24000 # liczba probek na sekunde
+DURATION = 2 # sekundy
 N_MELS = 128
 HOP_LENGTH = 512
 N_FFT = 2048
@@ -283,7 +283,7 @@ def plot_fold_results(fold_histories, fold_scores):
 
     plt.tight_layout()
     plt.savefig('kfold_results.png', dpi=300, bbox_inches='tight')
-    #plt.show()
+    plt.show()
 
     return fig
 
@@ -320,12 +320,12 @@ def plot_confusion_matrix(y_true, y_pred, class_names, fold_num=None):
         plt.savefig(f'confusion_matrix_fold_{fold_num}.png', dpi=300, bbox_inches='tight')
     else:
         plt.savefig('confusion_matrix_final.png', dpi=300, bbox_inches='tight')
-    #plt.show()
+    plt.show()
 
 ### USTAWIENIA TRENOWANIA, NIE ZAPOMNIJ O TYPU MODELI NA DOLE
-TRAIN_LEARNRATE=0.0001
-TRAIN_EPOCHS=6
-TRAIN_BATCHSIZE=64
+TRAIN_LEARNRATE=0.00001
+TRAIN_EPOCHS=3
+TRAIN_BATCHSIZE=32
 TRAIN_KFOLD_SPLITS=6
 
 # trenujemy model `n_splits` razy, w kazdym treningu mamy inne dane w treningu/walidacji; TODO: sprobowac zmienic liczbe treningow 6,10
@@ -382,8 +382,8 @@ def kfold_cross_validation(X, y, label_encoder, n_splits=5):
             input_shape=X_train.shape[1:],
             num_classes=len(np.unique(y))
         )
-        #MODEL_OBJECT.build_light_cnn()# <<< -------------------- WYBOR MODELU SIECI NEURONOWEJ ---------------------
-        MODEL_OBJECT.build_deep_cnn()
+        MODEL_OBJECT.build_light_cnn()# <<< -------------------- WYBOR MODELU SIECI NEURONOWEJ ---------------------
+        #MODEL_OBJECT.build_deep_cnn()
         #MODEL_OBJECT.build_resnet_inspired()
         #MODEL_OBJECT.inception_module()
         #MODEL_OBJECT.build_inception_inspired()
@@ -468,8 +468,8 @@ def kfold_cross_validation(X, y, label_encoder, n_splits=5):
 
 def main():
     # Ścieżki do danych nEMO
-    SAMPLES_PATH = "nEMO-main/samples/"
-    TSV_FILE = "nEMO-main/data.tsv"
+    SAMPLES_PATH = "samples"
+    TSV_FILE = "data.tsv"
 
     # Sprawdzenie czy używamy GPU
     gpus = tf.config.list_physical_devices('GPU')
