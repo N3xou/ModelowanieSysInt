@@ -14,6 +14,8 @@ import seaborn as sns
 from collections import Counter
 from NN_models import EmotionModels
 
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
+
 # Konfiguracja GPU
 print("=" * 70)
 print("KONFIGURACJA GPU")
@@ -95,7 +97,7 @@ print("=" * 70 + "\n")
 
 # Konfiguracja
 SAMPLE_RATE = 24000 # liczba probek na sekunde
-DURATION = 2 # sekundy
+DURATION = 6 # sekundy
 N_MELS = 128
 HOP_LENGTH = 512
 N_FFT = 2048
@@ -283,7 +285,7 @@ def plot_fold_results(fold_histories, fold_scores):
 
     plt.tight_layout()
     plt.savefig('kfold_results.png', dpi=300, bbox_inches='tight')
-    plt.show()
+    #plt.show()
 
     return fig
 
@@ -320,13 +322,13 @@ def plot_confusion_matrix(y_true, y_pred, class_names, fold_num=None):
         plt.savefig(f'confusion_matrix_fold_{fold_num}.png', dpi=300, bbox_inches='tight')
     else:
         plt.savefig('confusion_matrix_final.png', dpi=300, bbox_inches='tight')
-    plt.show()
+    #plt.show()
 
 ### USTAWIENIA TRENOWANIA, NIE ZAPOMNIJ O TYPU MODELI NA DOLE
 TRAIN_LEARNRATE=0.00001
-TRAIN_EPOCHS=3
+TRAIN_EPOCHS=512
 TRAIN_BATCHSIZE=32
-TRAIN_KFOLD_SPLITS=6
+TRAIN_KFOLD_SPLITS=8
 
 # trenujemy model `n_splits` razy, w kazdym treningu mamy inne dane w treningu/walidacji; TODO: sprobowac zmienic liczbe treningow 6,10
 def kfold_cross_validation(X, y, label_encoder, n_splits=5):
@@ -349,6 +351,11 @@ def kfold_cross_validation(X, y, label_encoder, n_splits=5):
 
         X_train, X_val = X[train_idx], X[val_idx]
         y_train, y_val = y[train_idx], y[val_idx]
+        
+        #scaler = StandardScaler();
+        #scaler.fit(X_train)
+        #X_train = scaler.transform(X_train)
+        #X_val = scaler.transform(X_val)
 
         print(f"Train set: {len(X_train)} próbek")
         print(f"Validation set: {len(X_val)} próbek")
@@ -382,9 +389,9 @@ def kfold_cross_validation(X, y, label_encoder, n_splits=5):
             input_shape=X_train.shape[1:],
             num_classes=len(np.unique(y))
         )
-        MODEL_OBJECT.build_light_cnn()# <<< -------------------- WYBOR MODELU SIECI NEURONOWEJ ---------------------
+        #MODEL_OBJECT.build_light_cnn()# <<< -------------------- WYBOR MODELU SIECI NEURONOWEJ ---------------------
         #MODEL_OBJECT.build_deep_cnn()
-        #MODEL_OBJECT.build_resnet_inspired()
+        MODEL_OBJECT.build_resnet_inspired()
         #MODEL_OBJECT.inception_module()
         #MODEL_OBJECT.build_inception_inspired()
         #MODEL_OBJECT.attention_block()
@@ -470,6 +477,8 @@ def main():
     # Ścieżki do danych nEMO
     SAMPLES_PATH = "samples"
     TSV_FILE = "data.tsv"
+    #SAMPLES_PATH = "nEMO-main/samples"
+    #TSV_FILE = "nEMO-main/data.tsv"
 
     # Sprawdzenie czy używamy GPU
     gpus = tf.config.list_physical_devices('GPU')
