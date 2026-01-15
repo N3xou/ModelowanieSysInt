@@ -42,7 +42,7 @@ if gpus:
             print(f"   GPU {i}: {gpu.name}")
 
         # Ustawienie GPU jako domyślnego urządzenia
-        logical_gpus = tf.config.list_logical_devices('GPU')
+        logic   al_gpus = tf.config.list_logical_devices('GPU')
         print(f"   Logical GPUs: {len(logical_gpus)}")
 
         # Wyświetlenie szczegółów GPU
