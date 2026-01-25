@@ -25,11 +25,11 @@ N_MELS = 64
 N_FFT = 1024
 HOP_LENGTH = 512
 
-MAX_SECONDS = 4.0
+MAX_SECONDS = 6.0
 MAX_SAMPLES = int(SR * MAX_SECONDS)
 
 BATCH_SIZE = 256
-EPOCHS = 50
+EPOCHS = 256
 LR = 1e-4
 
 SEED = 321
@@ -115,6 +115,66 @@ class Model(nn.Module):
         x = x.squeeze(-1).squeeze(-1)
         return self.classifier(x)
 
+class ResNetInspired(nn.Module):
+    def __init__(self, num_classes):
+        super().__init__()
+
+        self.features = nn.Sequential(
+
+            # Initial conv
+            nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3, bias=False),
+            nn.BatchNorm2d(64),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=3, stride=2, padding=1),
+
+            # Block 1
+            nn.Conv2d(64, 64, 3, padding=1),
+            nn.BatchNorm2d(64),
+            nn.ReLU(),
+            nn.Conv2d(64, 64, 3, padding=1),
+            nn.BatchNorm2d(64),
+            nn.ReLU(),
+
+            # Block 2
+            nn.Conv2d(64, 128, kernel_size=3),
+            nn.BatchNorm2d(128),
+            nn.ReLU(),
+            nn.Conv2d(128, 128, kernel_size=3),
+            nn.BatchNorm2d(128),
+            nn.ReLU(),
+
+            # Block 3
+            nn.Conv2d(128,256, kernel_size=3),
+            nn.BatchNorm2d(256),
+            nn.ReLU(),
+            nn.Conv2d(256, 256, kernel_size=3),
+            nn.BatchNorm2d(256),
+            nn.ReLU(),
+
+            ## Output
+            #nn.AdaptiveAvgPool2d((1,1)),
+            ##nn.Flat,
+            #nn.Linear(256,512), # this layer causes an error if enabled with (256,256) or (256,512) or (512,512), regardless of layers ahead or before it
+            #nn.Dropout(0.5),
+            #nn.Softmax2d(),
+        )
+
+        self.pool = nn.AdaptiveAvgPool2d((1, 1))
+        self.fc1 = nn.Linear(256,512)
+        self.fc2 = nn.Linear(512, num_classes)
+        self.dropout = nn.Dropout(0.5)
+
+    def forward(self, x):
+        x = self.features(x)
+        x = self.pool(x)
+        x = x.view(x.size(0), -1)  # Flatten
+        x = self.fc1(x)
+        #x = nn.ReLU(inplace=True)
+        x = self.dropout(x)
+        x = self.fc2(x)
+        return x
+
+
 def train_one_epoch(model: nn.Module, loader: DataLoader, optimizer: Optimizer, scheduler: LRScheduler, criterion, device: Device):
     model.train()
     total_loss = 0
@@ -190,10 +250,13 @@ def main():
     test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE)
 
     assert isinstance(dataset.label_encoder.classes_, Sized)
-    model = Model(num_classes=len(dataset.label_encoder.classes_)).to(device)
+    #model = Model(num_classes=len(dataset.label_encoder.classes_)).to(device)
+    model = ResNetInspired(num_classes=len(dataset.label_encoder.classes_)).to(device)
+    print(model)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=LR)
-    scheduler = torch.optim.lr_scheduler.LinearLR(optimizer, start_factor=1, end_factor=0.01, total_iters=EPOCHS)
+    #scheduler = torch.optim.lr_scheduler.LinearLR(optimizer, start_factor=1, end_factor=0.01, total_iters=EPOCHS)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=EPOCHS)
     criterion = nn.CrossEntropyLoss()
 
     best_test_acc = -inf
