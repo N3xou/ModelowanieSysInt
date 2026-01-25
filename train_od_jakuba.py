@@ -17,10 +17,6 @@ import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import train_test_split
-import kagglehub
-
-path = kagglehub.dataset_download("uwrfkaggler/ravdess-emotional-speech-audio")
-print("Path to dataset files:", path)
 
 import librosa
 
@@ -33,7 +29,7 @@ MAX_SECONDS = 4.0
 MAX_SAMPLES = int(SR * MAX_SECONDS)
 
 BATCH_SIZE = 256
-EPOCHS = 100
+EPOCHS = 50
 LR = 1e-4
 
 SEED = 321
@@ -48,62 +44,12 @@ def set_seed(seed: int):
     torch.cuda.manual_seed_all(seed)
 
 
-def pad_or_trunc(audio, max_len= 24000*4):
+def pad_or_trunc(audio, max_len):
     if len(audio) > max_len:
         return audio[:max_len]
     else:
         return np.pad(audio, (0, max_len - len(audio)))
 
-class RavdessDataset(Dataset):
-    EMOTION_MAP = {
-        "01": "neutral",
-        "02": "calm",
-        "03": "happy",
-        "04": "sad",
-        "05": "angry",
-        "06": "fearful",
-        "07": "disgust",
-        "08": "surprised"
-    }
-
-    def __init__(self, root_dir: str):
-        self.files = []
-        self.labels = []
-
-        for root, _, filenames in os.walk(root_dir):
-            for fname in filenames:
-                if fname.endswith(".wav"):
-                    emotion_id = fname.split("-")[2]
-                    self.files.append(os.path.join(root, fname))
-                    self.labels.append(self.EMOTION_MAP[emotion_id])
-
-        self.label_encoder = LabelEncoder()
-        self.labels = self.label_encoder.fit_transform(self.labels)
-
-    def __len__(self):
-        return len(self.files)
-
-    def __getitem__(self, idx):
-        wav_path = self.files[idx]
-
-        audio, _ = librosa.load(wav_path, sr=SR)
-        audio = pad_or_trunc(audio, MAX_SAMPLES)
-
-        mel = librosa.feature.melspectrogram(
-            y=audio,
-            sr=SR,
-            n_fft=N_FFT,
-            hop_length=HOP_LENGTH,
-            n_mels=N_MELS
-        )
-
-        mel = librosa.power_to_db(mel, ref=np.max)
-        mel = (mel - mel.mean()) / (mel.std() + 1e-6)
-
-        mel = torch.tensor(mel, dtype=torch.float32).unsqueeze(0)
-        label = torch.tensor(self.labels[idx], dtype=torch.long)
-
-        return mel, label
 
 class NemoDataset(Dataset):
     def __init__(self, tsv_path: str, audio_dir: str):
@@ -228,14 +174,12 @@ def main():
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print("Device:", device)
 
-    dataset = RavdessDataset(
-        root_dir=os.path.join(path, "audio_speech_actors_01-24")
-    )
+    dataset = NemoDataset(TSV_PATH, AUDIO_DIR)
 
     train_idx, test_idx = train_test_split(
         np.arange(len(dataset)),
         test_size=0.2,
-        stratify=dataset.labels,
+        stratify=dataset.df["label"],
         random_state=SEED
     )
 

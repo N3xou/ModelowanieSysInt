@@ -6,3 +6,6 @@ dataset_analysis.png
 emotion_recognition_model.h5
 label_encoder_classes.npy
 training_history.png
+__pycache__
+tmp.py
+runs/
