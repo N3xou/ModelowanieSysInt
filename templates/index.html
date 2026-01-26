@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎤 Speech Emotion Recognition</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Helvetica', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 28px;
+        }
+
+        .buttons-container {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            flex: 1;
+            min-width: 250px;
+            padding: 15px 20px;
+            font-size: 16px;
+            font-weight: bold;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            color: white;
+        }
+
+        #fileBtn {
+            background: #4CAF50;
+        }
+
+        #fileBtn:hover {
+            background: #45a049;
+            transform: translateY(-2px);
+        }
+
+        #micBtn {
+            background: #2196F3;
+        }
+
+        #micBtn:hover {
+            background: #0b7dda;
+            transform: translateY(-2px);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        .result-container {
+            background: #f5f5f5;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            min-height: 100px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .result-text {
+            font-size: 18px;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .emotion {
+            font-size: 24px;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .confidence {
+            font-size: 16px;
+            color: #666;
+        }
+
+        .status {
+            text-align: center;
+            font-size: 16px;
+            color: #666;
+            min-height: 30px;
+        }
+
+        .status.recording {
+            color: #4CAF50;
+            font-weight: bold;
+        }
+
+        .status.error {
+            color: #f44336;
+        }
+
+        .countdown {
+            font-size: 32px;
+            font-weight: bold;
+            color: #2196F3;
+        }
+
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎤 Speech Emotion Recognition</h1>
+
+        <div class="buttons-container">
+            <button id="fileBtn">📂 Predict from WAV file</button>
+            <button id="micBtn">🎙️ Record from Microphone</button>
+        </div>
+
+        <input type="file" id="fileInput" accept=".wav">
+
+        <div class="result-container">
+            <div class="result-text" id="resultText">Prediction: </div>
+        </div>
+
+        <div class="status" id="status"></div>
+    </div>
+
+    <script>
+        const fileBtn = document.getElementById('fileBtn');
+        const micBtn = document.getElementById('micBtn');
+        const fileInput = document.getElementById('fileInput');
+        const resultText = document.getElementById('resultText');
+        const status = document.getElementById('status');
+
+        const MAX_SECONDS = 4;
+        let mediaRecorder;
+        let audioChunks = [];
+
+        // File upload
+        fileBtn.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        fileInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                status.textContent = 'Processing...';
+                status.className = 'status';
+                resultText.innerHTML = '<div class="loader"></div>';
+
+                const response = await fetch('/predict_file', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (data.error) {
+                    status.textContent = 'Error: ' + data.error;
+                    status.className = 'status error';
+                    resultText.textContent = 'Prediction: ';
+                } else {
+                    status.textContent = '';
+                    resultText.innerHTML = `
+                        <div class="emotion">${data.emotion}</div>
+                        <div class="confidence">Confidence: ${data.confidence}%</div>
+                    `;
+                }
+            } catch (error) {
+                status.textContent = 'Error: ' + error.message;
+                status.className = 'status error';
+                resultText.textContent = 'Prediction: ';
+            }
+
+            fileInput.value = '';
+        });
+
+        // Microphone recording
+        micBtn.addEventListener('click', async () => {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+
+                mediaRecorder.addEventListener('dataavailable', (e) => {
+                    audioChunks.push(e.data);
+                });
+
+                mediaRecorder.addEventListener('stop', async () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                    const reader = new FileReader();
+
+                    reader.onloadend = async () => {
+                        const base64Audio = reader.result;
+
+                        try {
+                            status.textContent = 'Processing...';
+                            status.className = 'status';
+                            resultText.innerHTML = '<div class="loader"></div>';
+
+                            const response = await fetch('/predict_microphone', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json'
+                                },
+                                body: JSON.stringify({ audio: base64Audio })
+                            });
+
+                            const data = await response.json();
+
+                            if (data.error) {
+                                status.textContent = 'Error: ' + data.error;
+                                status.className = 'status error';
+                                resultText.textContent = 'Prediction: ';
+                            } else {
+                                status.textContent = '';
+                                resultText.innerHTML = `
+                                    <div class="emotion">${data.emotion}</div>
+                                    <div class="confidence">Confidence: ${data.confidence}%</div>
+                                `;
+                            }
+                        } catch (error) {
+                            status.textContent = 'Error: ' + error.message;
+                            status.className = 'status error';
+                            resultText.textContent = 'Prediction: ';
+                        }
+
+                        micBtn.disabled = false;
+                    };
+
+                    reader.readAsDataURL(audioBlob);
+                    stream.getTracks().forEach(track => track.stop());
+                });
+
+                mediaRecorder.start();
+                micBtn.disabled = true;
+
+                // Countdown
+                let timeLeft = MAX_SECONDS;
+                status.className = 'status recording';
+
+                const countdown = setInterval(() => {
+                    if (timeLeft > 0) {
+                        status.innerHTML = `Recording...<br><span class="countdown">${timeLeft}s</span>`;
+                        timeLeft--;
+                    } else {
+                        clearInterval(countdown);
+                        status.textContent = 'Recording complete';
+                    }
+                }, 1000);
+
+                setTimeout(() => {
+                    mediaRecorder.stop();
+                    clearInterval(countdown);
+                }, MAX_SECONDS * 1000);
+
+            } catch (error) {
+                status.textContent = 'Error accessing microphone: ' + error.message;
+                status.className = 'status error';
+            }
+        });
+    </script>
+</body>
+</html>

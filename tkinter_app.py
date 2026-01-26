@@ -10,6 +10,7 @@ import time
 import tkinter as tk
 from tkinter import filedialog, messagebox
 import threading
+from train_od_jakuba import ResNetInspired
 # -----------------------
 
 # Constants
@@ -21,7 +22,7 @@ HOP_LENGTH = 512
 MAX_SECONDS = 4
 MAX_SAMPLES = int(SR * MAX_SECONDS)
 
-MODEL_PATH = "best.pt"
+MODEL_PATH = "best-0.76.pt"
 
 
 # -----------------------
@@ -48,7 +49,7 @@ def extract_mel(audio):
 def load_model(model_path=MODEL_PATH):
     checkpoint = torch.load(model_path, map_location="cpu", weights_only=False)
     classes = checkpoint["labels"]
-    model = Model(num_classes=len(classes))
+    model = ResNetInspired(num_classes=len(classes))
     model.load_state_dict(checkpoint["model"])
     model.eval()
     return model, classes
