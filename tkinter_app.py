@@ -24,6 +24,8 @@ MAX_SAMPLES = int(SR * MAX_SECONDS)
 
 MODEL_PATH = "best-0.76.pt"
 
+recording = False
+mic_buffer = []
 
 # -----------------------
 # Utilities
@@ -69,7 +71,7 @@ def predict_emotion(audio, pad = 0):
         probs = torch.softmax(logits, dim=1)
         conf, idx = torch.max(probs, dim=1)
         emotion = classes[idx.item()]
-        confidence = conf.item()
+        confidence = conf.item()*100
     return f"{emotion} \n Confidence: {confidence:.2f}%"
 
 
@@ -79,36 +81,115 @@ def predict_from_file():
         return
     try:
         audio, _ = librosa.load(file_path, sr=SR)
-        result = predict_emotion(audio,1)
-        result_label.config(text=f"Prediction: {result}")
+
+        if len(audio) > MAX_SAMPLES:
+            emotion, avg_conf, dist = predict_long_audio(audio)
+
+            dist_text = "\n".join([f"{k}: {v}" for k, v in dist.items()])
+
+            result_label.config(
+                text=f"Prediction: {emotion}\nAvg confidence: {avg_conf:.2f}%\n\nDistribution:\n{dist_text}"
+            )
+        else:
+            result = predict_emotion(audio, 1)
+            result_label.config(text=f"Prediction: {result}")
+
     except Exception as e:
         messagebox.showerror("Error", str(e))
 
 
 def predict_from_microphone():
-    def record_thread():
-        try:
-            # Start recording
-            status_label.config(text=f"Recording {MAX_SECONDS} sec...", fg="green")
-            status_label.update_idletasks()
-            audio = sd.rec(int(MAX_SECONDS * SR), samplerate=SR, channels=1, dtype='float32')
+    global recording, mic_buffer
 
-            # Countdown timer display
-            for i in range(MAX_SECONDS, 0, -1):
-                status_label.config(text=f"...Recording... \n{i}s remaining")
-                status_label.update_idletasks()
-                time.sleep(1)
+    if not recording:
+        # START recording
+        recording = True
+        mic_buffer = []
 
-            sd.wait()
-            audio = audio.flatten()
-            result = predict_emotion(audio)
-            result_label.config(text=f"Prediction: {result}")
+        status_label.config(text="Recording... Press again to stop", fg="green")
+        status_label.update_idletasks()
+
+        def record_loop():
+            while recording:
+                chunk = sd.rec(int(0.5 * SR), samplerate=SR, channels=1, dtype='float32')
+                sd.wait()
+                mic_buffer.append(chunk.flatten())
+
+        threading.Thread(target=record_loop, daemon=True).start()
+
+    else:
+        # STOP recording
+        recording = False
+        status_label.config(text="Processing...", fg="blue")
+        status_label.update_idletasks()
+
+        audio = np.concatenate(mic_buffer) if mic_buffer else np.array([])
+
+        if len(audio) < MAX_SAMPLES:
+            messagebox.showwarning("Too short", "Recording must be at least 4 seconds long.")
             status_label.config(text="")
+            return
+
+        try:
+            emotion, avg_conf, dist = predict_long_audio(audio)
+
+            dist_text = "\n".join([f"{k}: {v}" for k, v in dist.items()])
+
+            result_label.config(
+                text=f"Prediction: {emotion}\nAvg confidence: {avg_conf:.2f}%\n\nDistribution:\n{dist_text}"
+            )
+            status_label.config(text="")
+
         except Exception as e:
             messagebox.showerror("Error", str(e))
             status_label.config(text="")
 
-    threading.Thread(target=record_thread).start()
+
+from collections import Counter, defaultdict
+
+def predict_long_audio(audio):
+    chunk_size = MAX_SAMPLES  # 4 seconds
+    total_len = len(audio)
+
+    num_chunks = total_len // chunk_size  # discard remainder
+
+    if num_chunks == 0:
+        return predict_emotion(audio, pad=1)
+
+    emotions = []
+    confidences = defaultdict(list)
+
+    for i in range(num_chunks):
+        start = i * chunk_size
+        end = start + chunk_size
+        chunk = audio[start:end]
+
+        mel = extract_mel(chunk)
+
+        with torch.no_grad():
+            logits = model(mel)
+            probs = torch.softmax(logits, dim=1)
+
+            conf, idx = torch.max(probs, dim=1)
+            emotion = classes[idx.item()]
+            confidence = conf.item() * 100
+
+        emotions.append(emotion)
+        confidences[emotion].append(confidence)
+
+    # Most common emotion
+    final_emotion = Counter(emotions).most_common(1)[0][0]
+
+    # Average confidence of that emotion
+    avg_confidence = np.mean(confidences[final_emotion])
+
+    # Optional: emotion distribution
+    emotion_percentages = {
+        emo: f"{(count/num_chunks)*100:.1f}%"
+        for emo, count in Counter(emotions).items()
+    }
+
+    return final_emotion, avg_confidence, emotion_percentages
 
 # -----------------------
 # Tkinter GUI
@@ -137,8 +218,18 @@ btn_file = tk.Button(frame_buttons, text="📂 Predict from WAV file", command=p
                      width=25, height=2, bg="#4CAF50", fg="white", font=("Helvetica", 12, "bold"))
 btn_file.grid(row=0, column=0, padx=10, pady=5)
 
-btn_mic = tk.Button(frame_buttons, text="🎙️ Record from Microphone", command=predict_from_microphone,
-                    width=25, height=2, bg="#2196F3", fg="white", font=("Helvetica", 12, "bold"))
+btn_mic = tk.Button(
+    frame_buttons,
+    text="🎙️ Start Recording",
+    command=predict_from_microphone,
+    width=25,
+    height=2,
+    bg="#2196F3",
+    fg="white",
+    font=("Helvetica", 12, "bold")
+)
+btn_mic.grid(row=0, column=1, padx=10, pady=5)
+
 btn_mic.grid(row=0, column=1, padx=10, pady=5)
 
 # Result label
